@@ -1,6 +1,7 @@
 import torch
 from PIL import Image
 from transformers import AutoTokenizer, AutoProcessor, AutoModelForImageTextToText
+import time  # <--- add this
 
 # -----------------------------
 # Model Setup
@@ -27,7 +28,10 @@ model.to(device)
 def ocr_image(image_path: str, max_new_tokens=2048) -> str:
     """
     OCR a single image and return Markdown-friendly text.
+    Logs the processing time.
     """
+    start_time = time.time()  # <--- start timer
+
     # Open image
     image = Image.open(image_path).convert("RGB")
 
@@ -88,6 +92,10 @@ Rules:
         skip_special_tokens=True,
         clean_up_tokenization_spaces=True,
     )
+
+    end_time = time.time()  # <--- end timer
+    elapsed = end_time - start_time
+    print(f"OCR completed in {elapsed:.2f} seconds for {image_path}")
 
     return output_text[0]
 

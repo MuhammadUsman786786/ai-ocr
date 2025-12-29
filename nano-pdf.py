@@ -2,34 +2,42 @@ import torch
 from PIL import Image
 from pdf2image import convert_from_path
 from transformers import AutoTokenizer, AutoProcessor, AutoModelForImageTextToText
+import time
+import os
 
 # -----------------------------
 # Model Setup
 # -----------------------------
 MODEL_ID = "nanonets/Nanonets-OCR-s"
 
-# Use dtype instead of deprecated torch_dtype
+# Load the model (FP16, MPS-compatible)
 model = AutoModelForImageTextToText.from_pretrained(
     MODEL_ID,
-    dtype=torch.float16,   # FP16 to save memory
-    device_map="auto"      # uses MPS (Apple GPU) automatically
+    dtype=torch.float16,   # FP16 saves memory
+    device_map="auto"      # will use Apple MPS if available
 )
 model.eval()
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
 processor = AutoProcessor.from_pretrained(MODEL_ID)
 
-# Optional: force MPS device
 device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
 model.to(device)
 
 # -----------------------------
-# OCR Function (single image)
+# OCR Function for single image
 # -----------------------------
-def ocr_image(image: Image.Image, max_new_tokens=4096) -> str:
+def ocr_image(image: Image.Image, max_new_tokens=2048) -> str:
     """
-    Run Nanonets-OCR-s on a single image and return Markdown-friendly text.
+    OCR a single PIL image and return Markdown-friendly text.
+    Logs the processing time.
     """
+    start_time = time.time()
+
+    # Preprocessing: resize for memory efficiency
+    image.thumbnail((1200, 1600))  # smaller, keeps readability
+
+    # Prompt for OCR
     prompt = """
 Extract the document text naturally.
 
@@ -54,7 +62,7 @@ Rules:
         },
     ]
 
-    # Prepare input for the model
+    # Prepare model input
     text = processor.apply_chat_template(
         messages,
         tokenize=False,
@@ -68,7 +76,7 @@ Rules:
         padding=True,
     ).to(device)
 
-    # Generate output
+    # Generate OCR output
     with torch.no_grad():
         output_ids = model.generate(
             **inputs,
@@ -76,7 +84,7 @@ Rules:
             do_sample=False,
         )
 
-    # Extract generated text
+    # Decode output
     generated_ids = [out[len(inp):] for inp, out in zip(inputs.input_ids, output_ids)]
     output_text = processor.batch_decode(
         generated_ids,
@@ -84,37 +92,53 @@ Rules:
         clean_up_tokenization_spaces=True,
     )
 
+    elapsed = time.time() - start_time
+    print(f"OCR completed in {elapsed:.2f} seconds for this page")
     return output_text[0]
 
 # -----------------------------
-# PDF → OCR Pipeline
+# OCR Function for PDF
 # -----------------------------
-def ocr_pdf(pdf_path: str, dpi=200) -> str:
+def ocr_pdf(pdf_path: str, output_dir: str = "ocr_output", dpi=200, combined_md: bool = True):
     """
-    Convert a scanned PDF to Markdown using Nanonets-OCR-s page by page.
+    Convert PDF → Images → OCR → Save Markdown
+    combined_md: if True, saves one single Markdown file
     """
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Convert PDF to images
+    print(f"Converting PDF to images: {pdf_path}")
     pages = convert_from_path(pdf_path, dpi=dpi)
+    print(f"PDF has {len(pages)} pages")
+
     full_text = ""
 
     for i, page in enumerate(pages, start=1):
-        print(f"OCR page {i}/{len(pages)}")
-        # Resize for memory efficiency
-        page.thumbnail((1650, 2200))
+        print(f"\nProcessing page {i}/{len(pages)}")
         page_text = ocr_image(page)
-        full_text += f"\n\n<!-- PAGE {i} -->\n\n{page_text}"
+        page_text = f"\n\n<!-- PAGE {i} -->\n\n{page_text}"
 
-    return full_text
+        # Save each page individually
+        page_file = os.path.join(output_dir, f"page_{i}.md")
+        with open(page_file, "w", encoding="utf-8") as f:
+            f.write(page_text)
+        print(f"Saved OCR of page {i} → {page_file}")
+
+        # Add to combined text
+        full_text += page_text
+
+    # Save combined Markdown if requested
+    if combined_md:
+        combined_file = os.path.join(output_dir, "combined_output.md")
+        with open(combined_file, "w", encoding="utf-8") as f:
+            f.write(full_text)
+        print(f"\nSaved combined Markdown → {combined_file}")
 
 # -----------------------------
 # Main
 # -----------------------------
 if __name__ == "__main__":
-    pdf_path = "scanned_document.pdf"  # path to your PDF
-    output_path = "output.md"
-
-    result = ocr_pdf(pdf_path)
-
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(result)
-
-    print(f"OCR complete → {output_path}")
+    # pdf_path = "scanned_document.pdf"  # Input PDF path
+    pdf_path = "text-pdf.pdf"  # Input PDF path
+    ocr_pdf(pdf_path, output_dir="ocr_results", dpi=200, combined_md=True)
