@@ -1,4 +1,3 @@
-# local_md_qa_with_logs.py
 import os
 import markdown
 from bs4 import BeautifulSoup
@@ -57,21 +56,33 @@ def search(query, texts, model, embeddings, top_k=1):
     return results
 
 # ----------------------------
-# 3️⃣ Local LLM for Q&A
+# 3️⃣ Local LLM for Q&A (MPS compatible)
 # ----------------------------
 def answer_question(context, question,
                     model_name="NousResearch/Llama-2-7b-chat-hf"):
     print(f"[INFO] Loading LLM model: {model_name}")
+
+    # Use MPS (Apple GPU) and float32 for stability
+    device = torch.device("mps")
+
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        device_map="auto",
-        torch_dtype=torch.float16
-    )
+        torch_dtype=torch.float32  # ✅ use float32 instead of float16
+    ).to(device)
+
     print("[INFO] Generating answer from LLM...")
     prompt = f"Context: {context}\nQuestion: {question}\nAnswer:"
-    inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
-    output = model.generate(**inputs, max_new_tokens=100)
+    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+
+    # ✅ disable sampling to avoid NaNs
+    with torch.no_grad():
+        output = model.generate(
+            **inputs,
+            max_new_tokens=100,
+            do_sample=False
+        )
+
     answer = tokenizer.decode(output[0], skip_special_tokens=True)
     answer = answer.split("Answer:")[-1].strip()
     print("[INFO] Answer generation complete")
@@ -88,7 +99,7 @@ if __name__ == "__main__":
     embed_model, embeddings = create_embeddings(texts)
 
     # Example query
-    query = "What is Swift Bank account number of user?"
+    query = "For Facilities Building how many minimum number of ropes are allowed? and give me the lift number for it also"
     results = search(query, texts, embed_model, embeddings, top_k=1)
 
     if results:
