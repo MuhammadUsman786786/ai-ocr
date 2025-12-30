@@ -160,7 +160,7 @@ if __name__ == "__main__":
     chunks, metadata = load_and_chunk_md(MARKDOWN_FOLDER)
     embed_model, embeddings = create_embeddings(chunks)
 
-    query = "what is the purpose of BSB number"
+    query = "schedule of water pump for SCP-CP-BF-01 TO 02"
     top_chunks = search(query, chunks, embed_model, embeddings, top_k=3)
 
     answer = answer_question(top_chunks, query)
