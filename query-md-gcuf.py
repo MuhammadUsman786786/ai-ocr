@@ -4,9 +4,10 @@ from bs4 import BeautifulSoup
 from sentence_transformers import SentenceTransformer, util
 from llama_cpp import Llama
 
-# ----------------------------
+
+# ============================================================
 # 1️⃣ Load & preprocess Markdown
-# ----------------------------
+# ============================================================
 def md_to_text(md_path: str) -> str:
     print(f"[INFO] Reading {md_path}")
     with open(md_path, "r", encoding="utf-8") as f:
@@ -17,21 +18,56 @@ def md_to_text(md_path: str) -> str:
     return soup.get_text(separator="\n")
 
 
-def load_md_files(folder_path: str):
-    texts, filenames = [], []
+# ============================================================
+# ⭐ 2️⃣ Chunking logic
+# ============================================================
+def chunk_text(
+    text: str,
+    chunk_size: int = 500,
+    overlap: int = 100
+):
+    """
+    Splits text into overlapping chunks.
+    Chunk size is approx tokens (based on words).
+    """
+    words = text.split()
+    chunks = []
+
+    start = 0
+    while start < len(words):
+        end = start + chunk_size
+        chunk = " ".join(words[start:end])
+        chunks.append(chunk)
+        start += chunk_size - overlap
+
+    return chunks
+
+
+def load_and_chunk_md(folder_path: str):
+    all_chunks = []
+    metadata = []
+
     for fname in os.listdir(folder_path):
         if fname.endswith(".md"):
             path = os.path.join(folder_path, fname)
-            texts.append(md_to_text(path))
-            filenames.append(fname)
+            text = md_to_text(path)
 
-    print(f"[INFO] Loaded {len(texts)} markdown files")
-    return texts, filenames
+            chunks = chunk_text(text)
+
+            for i, chunk in enumerate(chunks):
+                all_chunks.append(chunk)
+                metadata.append({
+                    "file": fname,
+                    "chunk_id": i
+                })
+
+    print(f"[INFO] Created {len(all_chunks)} chunks")
+    return all_chunks, metadata
 
 
-# ----------------------------
-# 2️⃣ Embeddings (Semantic Search)
-# ----------------------------
+# ============================================================
+# 3️⃣ Embeddings & Semantic Search
+# ============================================================
 def create_embeddings(texts):
     print("[INFO] Loading embedding model...")
     model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -45,7 +81,7 @@ def create_embeddings(texts):
     return model, embeddings
 
 
-def search(query, texts, model, embeddings, top_k=1):
+def search(query, texts, model, embeddings, top_k=3):
     query_emb = model.encode(query, convert_to_tensor=True)
     hits = util.semantic_search(query_emb, embeddings, top_k=top_k)
 
@@ -57,31 +93,35 @@ def search(query, texts, model, embeddings, top_k=1):
     return results
 
 
-# ----------------------------
-# 3️⃣ Load LLaMA-2 GGUF (ONCE)
-# ----------------------------
-print("[INFO] Loading LLaMA-2 GGUF model...")
+# ============================================================
+# 4️⃣ Load LLaMA-2 (LOCAL)
+# ============================================================
+MODEL_PATH = os.path.join("models", "llama-2-7b-chat.Q4_K_M.gguf")
+assert os.path.exists(MODEL_PATH)
+
+print("[INFO] Loading LLaMA-2 model...")
 
 llm = Llama(
-    model_path="models/llama-2-7b-chat.Q4_K_M.gguf",
+    model_path=MODEL_PATH,
     n_ctx=4096,
     n_threads=os.cpu_count(),
-    n_gpu_layers=-1,   # ✅ use Metal GPU fully
+    n_gpu_layers=-1,
     verbose=False
 )
 
 print("[INFO] LLaMA model loaded")
 
 
-# ----------------------------
-# 4️⃣ Q&A with LLaMA-2
-# ----------------------------
-def answer_question(context: str, question: str) -> str:
-    # Trim context for speed & stability
+# ============================================================
+# 5️⃣ Question Answering
+# ============================================================
+def answer_question(context_chunks, question):
+    context = "\n\n".join(context_chunks)
     context = context[:3000]
 
     prompt = f"""[INST]
-You are a helpful assistant. Answer the question ONLY using the provided context.
+You are a helpful assistant.
+Answer the question ONLY using the provided context.
 
 Context:
 {context}
@@ -102,25 +142,24 @@ Question:
     return output["choices"][0]["text"].strip()
 
 
-# ----------------------------
-# 5️⃣ Main Flow
-# ----------------------------
+# ============================================================
+# 6️⃣ Main
+# ============================================================
 if __name__ == "__main__":
-    folder = "./ocr_results"  # folder with .md files
+    MARKDOWN_FOLDER = "./ocr_results"
 
-    texts, filenames = load_md_files(folder)
+    chunks, metadata = load_and_chunk_md(MARKDOWN_FOLDER)
+    embed_model, embeddings = create_embeddings(chunks)
 
-    embed_model, embeddings = create_embeddings(texts)
+    query = "what is the purpose of BSB number"
 
-    query = (
-        "For Facilities Building how many minimum number of ropes "
-        "are allowed? and give me the lift number for it also"
+    top_chunks = search(
+        query,
+        chunks,
+        embed_model,
+        embeddings,
+        top_k=3
     )
 
-    results = search(query, texts, embed_model, embeddings, top_k=1)
-
-    if results:
-        answer = answer_question(results[0], query)
-        print("\n✅ Answer:\n", answer)
-    else:
-        print("❌ No relevant context found.")
+    answer = answer_question(top_chunks, query)
+    print("\n✅ Answer:\n", answer)
