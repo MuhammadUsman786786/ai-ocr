@@ -46,31 +46,9 @@ def process_pdf(
         f.write(result.extract_markdown())
     print(f"[OUTPUT] Markdown saved: {md_path}")
 
-    # ----------------------------
-    # Save JSON
-    # ----------------------------
-    json_path = os.path.join(output_dir, "output.json")
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(result.extract_data(), f, indent=2, ensure_ascii=False)
-    print(f"[OUTPUT] JSON saved: {json_path}")
-
-    # ----------------------------
-    # Save CSV (tables if present)
-    # ----------------------------
-    csv_path = os.path.join(output_dir, "output_tables.csv")
-    try:
-        csv_text = result.extract_csv()
-        with open(csv_path, "w", encoding="utf-8") as f:
-            f.write(csv_text)
-        print(f"[OUTPUT] CSV saved: {csv_path}")
-    except Exception:
-        print("[WARN] No tables found — CSV not generated.")
-        csv_path = None
 
     return {
         "markdown": md_path,
-        "json": json_path,
-        "csv": csv_path,
     }
 
 
