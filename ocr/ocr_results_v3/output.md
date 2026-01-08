@@ -64,9 +64,20 @@ Description: WCC-CP-BF-01 to 03
       <td>≥ 9.0</td>
       <td>10</td>
     </tr>
+  </tbody>
+</table>
+
+(1) COMPRESSOR & MOTOR
+
+<table>
+  <thead>
     <tr>
-      <td colspan="3">(1) COMPRESSOR & MOTOR</td>
+      <th>Description</th>
+      <th>Specified</th>
+      <th>Offered</th>
     </tr>
+  </thead>
+  <tbody>
     <tr>
       <td>Type of compressor</td>
       <td>Scroll / Screw / Centrifugal</td>
