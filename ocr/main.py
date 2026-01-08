@@ -1,9 +1,11 @@
 import os
+os.environ['CURL_CA_BUNDLE'] = ''
+
 import torch
 
-from docstrange_ocr_pipeline import run_ocr_pipeline
+# from docstrange_ocr_pipeline import run_ocr_pipeline
+from nano_ocr_pipeline import run_ocr_pipeline
 from inference_pipeline import load_llm, run_inference_pipeline
-os.environ['CURL_CA_BUNDLE'] = ''
 
 
 def run_full_pipeline(
