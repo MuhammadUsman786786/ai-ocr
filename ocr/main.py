@@ -25,6 +25,7 @@ def run_full_pipeline(
         pdf_path=pdf_path,
         output_dir=output_dir
     )
+    # markdown_path = 'ocr_results_v3/output.md'
 
     # LLM
     llm = load_llm(model_path)
@@ -43,12 +44,12 @@ def run_full_pipeline(
 # CLI Entry
 # ----------------------------
 if __name__ == "__main__":
-    PDF_PATH = "scanned_3_pages.pdf"
+    PDF_PATH = "scanned_2_pages.pdf"
     OUTPUT_DIR = "./ocr_results_v3"
     MODEL_PATH = "../models/llama-2-7b-chat.Q4_K_M.gguf"
 
     questions = [
-        "for manufacturer York, what is the value of Refrigerant"
+        "for manufacturer York, what is the value of Refrigerant",
     ]
 
     answers = run_full_pipeline(
@@ -58,7 +59,7 @@ if __name__ == "__main__":
         questions=questions
     )
 
-    print("\n\n")
+    print("\n\n\n\n")
     print("\n".join(answers))
 
 

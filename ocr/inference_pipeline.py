@@ -82,15 +82,13 @@ def run_inference_pipeline(
     # One prompt per question
     for idx, question in enumerate(questions):
         context_chunks = [chunks[h["corpus_id"]] for h in hits[idx]]
-        context = "\n\n".join(context_chunks)[:3000]
+        context = "\n\n".join(context_chunks)[:5000]
 
         prompt = f"""[INST]
 Answer ONLY from the context.
 
 Return the answer in EXACTLY this format:
 Answer is: {{answer}}
-
-Do not add explanations, sentences, or extra text.
 
 Context:
 {context}
