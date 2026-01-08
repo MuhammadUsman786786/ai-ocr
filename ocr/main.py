@@ -1,7 +1,7 @@
 import os
 import torch
 
-from ocr_pipeline import run_ocr_pipeline
+from docstrange_ocr_pipeline import run_ocr_pipeline
 from inference_pipeline import load_llm, run_inference_pipeline
 os.environ['CURL_CA_BUNDLE'] = ''
 
