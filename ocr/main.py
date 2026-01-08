@@ -43,12 +43,12 @@ def run_full_pipeline(
 # CLI Entry
 # ----------------------------
 if __name__ == "__main__":
-    PDF_PATH = "scanned_v3.pdf"
+    PDF_PATH = "scanned_3_pages.pdf"
     OUTPUT_DIR = "./ocr_results_v3"
     MODEL_PATH = "../models/llama-2-7b-chat.Q4_K_M.gguf"
 
     questions = [
-        "for model YK1BKRH95CVG and manufacturer York, what is the value of Refrigerant"
+        "for manufacturer York, what is the value of Refrigerant"
     ]
 
     answers = run_full_pipeline(
