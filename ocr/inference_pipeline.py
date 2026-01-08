@@ -49,11 +49,11 @@ def load_llm(model_path: str):
 
 
 # ============================================================
-# Inference pipeline
+# Inference pipeline (MULTI-QUESTION)
 # ============================================================
 def run_inference_pipeline(
     markdown_path: str,
-    question: str,
+    questions: list[str],
     llm: Llama,
     top_k: int = 3,
 ):
@@ -63,19 +63,34 @@ def run_inference_pipeline(
     text = md_to_text(markdown_path)
     chunks = chunk_text(text)
 
-    # Embeddings
+    # Embeddings (computed ONCE)
     embed_model = SentenceTransformer("all-MiniLM-L6-v2")
-    embeddings = embed_model.encode(chunks, convert_to_tensor=True)
+    corpus_embeddings = embed_model.encode(chunks, convert_to_tensor=True)
 
-    # Search
-    query_emb = embed_model.encode(question, convert_to_tensor=True)
-    hits = util.semantic_search(query_emb, embeddings, top_k=top_k)
+    # Encode all questions at once
+    query_embeddings = embed_model.encode(questions, convert_to_tensor=True)
 
-    context_chunks = [chunks[h["corpus_id"]] for h in hits[0]]
-    context = "\n\n".join(context_chunks)[:3000]
+    # Semantic search
+    hits = util.semantic_search(
+        query_embeddings,
+        corpus_embeddings,
+        top_k=top_k
+    )
 
-    prompt = f"""[INST]
+    answers = []
+
+    # One prompt per question
+    for idx, question in enumerate(questions):
+        context_chunks = [chunks[h["corpus_id"]] for h in hits[idx]]
+        context = "\n\n".join(context_chunks)[:3000]
+
+        prompt = f"""[INST]
 Answer ONLY from the context.
+
+Return the answer in EXACTLY this format:
+Answer is: {{answer}}
+
+Do not add explanations, sentences, or extra text.
 
 Context:
 {context}
@@ -85,14 +100,16 @@ Question:
 [/INST]
 """
 
-    output = llm(
-        prompt,
-        max_tokens=200,
-        temperature=0.2,
-        top_p=0.9,
-        stop=["</s>"]
-    )
+        output = llm(
+            prompt,
+            max_tokens=100,
+            temperature=0.1,
+            top_p=0.9,
+            stop=["</s>"]
+        )
+
+        answers.append(output["choices"][0]["text"].strip())
 
     print(f"[LLM] Inference completed in {time.time() - start_total:.2f}s")
 
-    return output["choices"][0]["text"].strip()
+    return answers

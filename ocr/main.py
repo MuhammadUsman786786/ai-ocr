@@ -3,13 +3,14 @@ import torch
 
 from ocr_pipeline import run_ocr_pipeline
 from inference_pipeline import load_llm, run_inference_pipeline
+os.environ['CURL_CA_BUNDLE'] = ''
 
 
 def run_full_pipeline(
     pdf_path: str,
     output_dir: str,
     model_path: str,
-    question: str,
+    questions: list[str],
 ):
     # Device info
     if torch.backends.mps.is_available():
@@ -29,7 +30,7 @@ def run_full_pipeline(
     # Inference
     answer = run_inference_pipeline(
         markdown_path=markdown_path,
-        question=question,
+        questions=questions,
         llm=llm
     )
 
@@ -40,17 +41,22 @@ def run_full_pipeline(
 # CLI Entry
 # ----------------------------
 if __name__ == "__main__":
-    PDF_PATH = "scanned_v2.pdf"
-    OUTPUT_DIR = "./ocr_results"
+    PDF_PATH = "scanned_v3.pdf"
+    OUTPUT_DIR = "./ocr_results_v3"
     MODEL_PATH = "../models/llama-2-7b-chat.Q4_K_M.gguf"
 
-    QUESTION = "schedule of water pump for SCP-CP-BF-01 TO 02"
+    questions = [
+        "for model YK1BKRH95CVG and manufacturer York, what is the value of Refrigerant"
+    ]
 
-    answer = run_full_pipeline(
+    answers = run_full_pipeline(
         pdf_path=PDF_PATH,
         output_dir=OUTPUT_DIR,
         model_path=MODEL_PATH,
-        question=QUESTION
+        questions=questions
     )
 
-    print("\n✅ Final Answer:\n", answer)
+    print("\n\n")
+    print("\n".join(answers))
+
+
